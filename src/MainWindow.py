@@ -1,6 +1,5 @@
 from PyQt5.QtWidgets import (
-    QMainWindow, QMessageBox,
-    QWidget, QVBoxLayout, QHBoxLayout, QPushButton
+    QMainWindow, QMessageBox
 )
 from PyQt5.QtCore import pyqtSlot
 from MainMenu import MainMenu
@@ -9,29 +8,16 @@ from Teacher import View
 class MainWindow(QMainWindow):
     def __init__(self, parent=None):
         super().__init__(parent)
-
+        self.setWindowTitle('Управление заданиями для учащихся')
         main_menu = MainMenu(parent=self)
         self.setMenuBar(main_menu)
+        w = View(parent=self)
+        self.setCentralWidget(w)
         main_menu.about.triggered.connect(self.about)
         main_menu.about_qt.triggered.connect(self.about_qt)
-
-        w = QWidget(parent=self)
-        view = View(parent=w)
-        layout = QVBoxLayout()
-        layout.addWidget(view)
-        add_button = QPushButton('Добавить', parent=w)
-        add_button.clicked.connect(view.add)
-        update_button = QPushButton('Редактировать', parent=w)
-        update_button.clicked.connect(view.update)
-        delete_button = QPushButton('Удалить', parent=w)
-        delete_button.clicked.connect(view.delete)
-        button_layout = QHBoxLayout()
-        button_layout.addWidget(add_button)
-        button_layout.addWidget(update_button)
-        button_layout.addWidget(delete_button)
-        layout.addLayout(button_layout)
-        w.setLayout(layout)
-        self.setCentralWidget(w)
+        main_menu.teacher_add.triggered.connect(w.add)
+        main_menu.teacher_edit.triggered.connect(w.update)
+        main_menu.teacher_delete.triggered.connect(w.delete)
 
     @pyqtSlot()
     def about(self):

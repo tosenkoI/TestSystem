@@ -4,8 +4,7 @@ from PyQt5.QtWidgets import (
     QVBoxLayout, QHBoxLayout
 )
 from PyQt5.QtSql import QSqlQueryModel, QSqlQuery
-from PyQt5.QtCore import pyqtSlot
-
+from PyQt5.QtCore import pyqtSlot, Qt
 
 class Model(QSqlQueryModel):
     def __init__(self, parent=None):
@@ -42,6 +41,13 @@ class Model(QSqlQueryModel):
         '''
         sel_query.prepare(SELECT_ONE)
         sel_query.bindValue(':id_teacher', id_teacher)
+        sel_query.exec_()
+        if sel_query.isActive():
+            sel_query.first()
+            return (sel_query.value('fio'), sel_query.value('phone'),
+                    sel_query.value('email'), sel_query.value('comnt'))
+        self.refresh()
+        return "", "", "", ""
 
     def update(self, fio, phone, email, comnt, id_teacher):
         upd_query = QSqlQuery()
@@ -58,16 +64,38 @@ class Model(QSqlQueryModel):
         upd_query.bindValue(':phone', phone[:10])
         upd_query.bindValue(':email', email)
         upd_query.bindValue(':comnt', comnt)
-        upd_query.bindValue('id_teacher', id_teacher)
+        upd_query.bindValue(':id_teacher', id_teacher)
         upd_query.exec_()
+        self.refresh()
+
+    def delete(self, id_teacher):
+        del_query = QSqlQuery()
+        DELETE = '''
+            delete from teachers where id_teacher = :id_teacher ;
+        '''
+        del_query.prepare(DELETE)
+        del_query.bindValue(':id_teacher', id_teacher)
+        del_query.exec_()
         self.refresh()
 
 class View(QTableView):
     def __init__(self, parent=None):
         super().__init__(parent)
-
         model = Model(parent=self)
         self.setModel(model)
+        model.setHeaderData(1, Qt.Horizontal, "ФИО")
+        model.setHeaderData(2, Qt.Horizontal, "Телефон")
+        model.setHeaderData(3, Qt.Horizontal, "Почта")
+        model.setHeaderData(4, Qt.Horizontal, "Коментарий")
+        self.setSelectionBehavior(self.SelectRows)
+        self.setSelectionMode(self.SingleSelection)
+        self.hideColumn(0)
+        self.setWordWrap(False)
+        vh = self.verticalHeader()
+        vh.setSectionResizeMode(vh.Fixed)
+        hh = self.horizontalHeader()
+        hh.setSectionResizeMode(hh.ResizeToContents)
+        hh.setSectionResizeMode(4, hh.Stretch)
 
     @pyqtSlot()
     def add(self):
@@ -81,12 +109,18 @@ class View(QTableView):
         row = self.currentIndex().row()
         id_teacher = self.model().record(row).value(0)
         dialog.fio, dialog.phone, dialog.email, dialog.comnt = self.model().select_one(id_teacher)
-        if dialog.exec():
+        if not dialog.fio:
+            QMessageBox.information(self, 'Учитель', 'Учитель не был найден в базе.\nВозможно запись была удалена.')
+        elif dialog.exec():
             self.model().update(dialog.fio, dialog.phone, dialog.email, dialog.comnt, id_teacher)
 
     @pyqtSlot()
     def delete(self):
-        QMessageBox.information(self, 'Учитель', 'Удаление')
+        ans = QMessageBox.question(self, 'Учитель', 'Вы уверены?')
+        if ans == QMessageBox.Yes:
+            row = self.currentIndex().row()
+            id_teacher = self.model().record(row).value(0)
+            self.model().delete(id_teacher)
 
 class Dialog(QDialog):
     def __init__(self, parent=None):
