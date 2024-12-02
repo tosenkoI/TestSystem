@@ -4,21 +4,99 @@ from PyQt5.QtWidgets import (
     QLabel, QLineEdit, QTextEdit, QPushButton,
     QStyledItemDelegate
 )
-from PyQt5.QtSql import QSqlTableModel, QSqlQuery
+from PyQt5.QtSql import QSqlQueryModel, QSqlQuery
 from PyQt5.QtCore import Qt, pyqtSlot
 
 
-class Model(QSqlTableModel):
+class Model(QSqlQueryModel):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setTable('tests')
-        self.select()
+        self.refresh()
+        self.__authors = {} #it works until fio unique
+        self.selectAuthors()
 
+    @property
+    def author_id(self, fio):
+        return self.__authors[fio]
+
+    def refresh(self):
+        sql = '''
+            select t.id_test, t.tname, t.tcontent, a.fio from tests as t, teachers as a
+                where t.teacher_id = a.id_teacher ;
+        '''
+        self.setQuery(sql)
+
+    def add(self, tname, tcontent, teacher):
+        add_query = QSqlQuery()
+        teacher_id = self.author_id(teacher)
+        INSERT = '''
+            insert into tests ( tname, tcontent, teacher_id )
+            values ( :tname, :tcontent, :teacher_id)
+        '''
+        add_query.prepare(INSERT)
+        add_query.bindValue(':tname', tname)
+        add_query.bindValue('tcontent', tcontent)
+        add_query.bindValue('teacher_id', teacher_id)
+        add_query.exec_()
+        self.refresh()
+
+    def select_one(self, id_test):
+        one_query = QSqlQuery()
+        SELECT_ONE = '''
+            select tname, tcontent, teacher_id
+            from tests
+            where id_test = :id_test ;
+        '''
+        one_query.prepare(SELECT_ONE)
+        one_query.bindValue(':id_test', id_test)
+        one_query.exec_()
+        #TODO
+
+    def update(self, tname, tcontent, teacher, id_test):
+        upd_query = QSqlQuery()
+        teacher_id = self.author_id(teacher)
+        UPDATE = '''
+            update tests set 
+                tname = :tname, 
+                tcontent = :tcontent,
+                teacher_id = :teacher_id
+            where id_test = :id_test ;
+        '''
+        upd_query.prepare(UPDATE)
+        upd_query.bindValue(':tname', tname)
+        upd_query.bindValue(':tcontent', tcontent)
+        upd_query.bindValue(':teacher_id', teacher_id)
+        upd_query.bindValue(':id_test', id_test)
+        upd_query.exec_()
+        self.refresh()
+
+    def delete(self, id_test):
+        del_query = QSqlQuery()
+        DELETE = '''
+            delete from tests where id_test = :id_test ;
+        '''
+        del_query.prepare(DELETE)
+        del_query.bindValue(':id_test', id_test)
+        del_query.exec_()
+        self.refresh()
+
+    def selectAuthors(self):
+        sel_query = QSqlQuery()
+        SELECT = '''
+            select id_teacher, fio
+                from teachers ;
+        '''
+        sel_query.exec_(SELECT)
+        if sel_query.isActive():
+            sel_query.first()
+            while sel_query.isValid():
+                self.__authors[sel_query.value('fio')] = sel_query.value('id_teacher')
+                sel_query.next()
+            print(self.__authors)
 
 class View(QTableView):
-    def __init__(self, conn, parent=None):
+    def __init__(self, parent=None):
         super().__init__(parent)
-        self.conn = conn
         model = Model(parent=self)
         self.setModel(model)
         model.setHeaderData(1, Qt.Horizontal, "Название")
@@ -34,7 +112,6 @@ class View(QTableView):
         hh.setSectionResizeMode(2, hh.Stretch)
         self.selectAuthors()
         self.setItemDelegateForColumn(3, ComboBoxDelegate(parent=self))
-        #self.setColumnWidth()
 
     def add(self):
         #self.model().insertRow(self.model().rowCount())
@@ -55,20 +132,6 @@ class View(QTableView):
             self.model().removeRow(self.currentIndex().row())
             self.model().select()
 
-    def selectAuthors(self):
-        sel_query = QSqlQuery()
-        SELECT = '''
-            select id_teacher, fio
-                from teachers ;
-        '''
-        sel_query.exec_(SELECT)
-        if sel_query.isActive():
-            sel_query.first()
-            self.__authors = {} #work until fio unique
-            while sel_query.isValid():
-                self.__authors[sel_query.value('fio')] = sel_query.value('id_teacher')
-                sel_query.next()
-            print(self.__authors)
 
     @property
     def authors(self):

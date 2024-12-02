@@ -3,21 +3,22 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import pyqtSlot
 from MainMenu import MainMenu
-from src import Test
+import Test
+#import Teacher
 
 
 class MainWindow(QMainWindow):
-    def __init__(self, conn, parent=None):
+    def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle('Управление заданиями для учащихся')
         main_menu = MainMenu(parent=self)
         self.setMenuBar(main_menu)
-        w = Test.View(conn, parent=self)
+        w = Test.View(parent=self)
+        #w = Teacher.View(conn, parent=self)
         self.setCentralWidget(w)
         main_menu.about.triggered.connect(self.about)
         main_menu.about_qt.triggered.connect(self.about_qt)
         #main_menu.teacher_add.triggered.connect(w.add)
-        #main_menu.teacher_edit.triggered.connect(w.update)
         #main_menu.teacher_delete.triggered.connect(w.delete)
         main_menu.test_add.triggered.connect(w.add)
         main_menu.test_delete.triggered.connect(w.delete)

@@ -5,7 +5,6 @@ class MainMenu(QMenuBar):
         super().__init__(parent)
         teacher_menu = self.addMenu('Учитель')
         self.__teacher_add = teacher_menu.addAction('Добавить')
-        self.__teacher_edit = teacher_menu.addAction('Редактировать')
         self.__teacher_delete = teacher_menu.addAction('Удалить')
         teacher_menu = self.addMenu('Задача')
         self.__test_add = teacher_menu.addAction('Добавить')
