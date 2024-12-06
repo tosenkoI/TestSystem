@@ -21,6 +21,7 @@ class MainWindow(QMainWindow):
         #main_menu.teacher_add.triggered.connect(w.add)
         #main_menu.teacher_delete.triggered.connect(w.delete)
         main_menu.test_add.triggered.connect(w.add)
+        main_menu.test_update.triggered.connect(w.update)
         main_menu.test_delete.triggered.connect(w.delete)
 
     @pyqtSlot()

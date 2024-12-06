@@ -15,14 +15,21 @@ class Model(QSqlQueryModel):
         self.__authors = {} #it works until fio unique
         self.selectAuthors()
 
-    @property
     def author_id(self, fio):
         return self.__authors[fio]
 
+    @property
+    def authors(self):
+        return self.__authors.keys()
+
     def refresh(self):
         sql = '''
-            select t.id_test, t.tname, t.tcontent, a.fio from tests as t, teachers as a
-                where t.teacher_id = a.id_teacher ;
+            select t.id_test, t.tname, t.tcontent, a.fio 
+                from tests as t, teachers as a
+                where t.teacher_id = a.id_teacher 
+                union
+            select id_test, tname, tcontent, ''
+	            from tests where teacher_id is null ;
         '''
         self.setQuery(sql)
 
@@ -31,26 +38,36 @@ class Model(QSqlQueryModel):
         teacher_id = self.author_id(teacher)
         INSERT = '''
             insert into tests ( tname, tcontent, teacher_id )
-            values ( :tname, :tcontent, :teacher_id)
+            values ( :tname, :tcontent, :teacher_id ) ;
         '''
         add_query.prepare(INSERT)
         add_query.bindValue(':tname', tname)
-        add_query.bindValue('tcontent', tcontent)
-        add_query.bindValue('teacher_id', teacher_id)
+        add_query.bindValue(':tcontent', tcontent)
+        add_query.bindValue(':teacher_id', teacher_id)
+        #TODO добавить информацию для пользователя, записались ли данные в базу
         add_query.exec_()
+        print(add_query.lastQuery())
+        print(tname, tcontent, teacher_id)
+        print(add_query.lastError().text())
         self.refresh()
 
     def select_one(self, id_test):
         one_query = QSqlQuery()
         SELECT_ONE = '''
-            select tname, tcontent, teacher_id
-            from tests
-            where id_test = :id_test ;
+            select t.tname, tcontent, (
+	                        select fio from teachers
+	                        where id_teacher = t.teacher_id )
+                from tests as t
+                where id_test = :id_test ;
         '''
         one_query.prepare(SELECT_ONE)
         one_query.bindValue(':id_test', id_test)
         one_query.exec_()
-        #TODO
+        if one_query.isActive():
+            one_query.first()
+            return (one_query.value('tname'),
+                    one_query.value('tcontent'),
+                one_query.value('fio') if (one_query.value('fio')) else '')
 
     def update(self, tname, tcontent, teacher, id_test):
         upd_query = QSqlQuery()
@@ -67,6 +84,7 @@ class Model(QSqlQueryModel):
         upd_query.bindValue(':tcontent', tcontent)
         upd_query.bindValue(':teacher_id', teacher_id)
         upd_query.bindValue(':id_test', id_test)
+        # TODO добавить информацию для пользователя, записались ли данные в базу
         upd_query.exec_()
         self.refresh()
 
@@ -77,6 +95,7 @@ class Model(QSqlQueryModel):
         '''
         del_query.prepare(DELETE)
         del_query.bindValue(':id_test', id_test)
+        # TODO добавить информацию для пользователя, записались ли данные в базу
         del_query.exec_()
         self.refresh()
 
@@ -92,6 +111,7 @@ class Model(QSqlQueryModel):
             while sel_query.isValid():
                 self.__authors[sel_query.value('fio')] = sel_query.value('id_teacher')
                 sel_query.next()
+            self.__authors[''] = None
             print(self.__authors)
 
 class View(QTableView):
@@ -110,53 +130,38 @@ class View(QTableView):
         hh = self.horizontalHeader()
         hh.setSectionResizeMode(hh.ResizeToContents)
         hh.setSectionResizeMode(2, hh.Stretch)
-        self.selectAuthors()
-        self.setItemDelegateForColumn(3, ComboBoxDelegate(parent=self))
+        #self.setItemDelegateForColumn(3, ComboBoxDelegate(parent=self))
 
+    @pyqtSlot()
     def add(self):
-        #self.model().insertRow(self.model().rowCount())
         dialog = Dialog(self)
         if dialog.exec():
-            rec = self.conn.record('tests')
-            rec.setValue('id_test', self.model().rowCount())
-            rec.setValue('tname', dialog.tname)
-            rec.setValue('tcontent', dialog.tcontent)
-            rec.setValue('teacher_id', None if dialog.teacher == "" else self.__authors[dialog.teacher])
-            print(rec.value(0), rec.value(1), rec.value(2), rec.value(3))
-            print(self.model().insertRecord(-1, rec), self.model().lastError().text())
-            self.model().select()
+            self.model().add(dialog.tname, dialog.tcontent, dialog.teacher)
 
+    @pyqtSlot()
+    def update(self):
+        dialog = Dialog(self)
+        row = self.currentIndex().row()
+        id_test = self.model().record(row).value(0)
+        dialog.tname, dialog.tcontent, dialog.teacher = self.model().select_one(id_test)
+        if dialog.exec():
+            self.model().update(dialog.tname, dialog.tcontent, dialog.teacher, id_test)
+
+    @pyqtSlot()
     def delete(self):
         ans = QMessageBox.question(self, 'Задача', 'Вы уверены?')
         if ans == QMessageBox.Yes:
-            self.model().removeRow(self.currentIndex().row())
-            self.model().select()
-
+            row = self.currentIndex().row()
+            id_test = self.model().record(row).value(0)
+            self.model().delete(id_test)
 
     @property
     def authors(self):
-        return self.__authors.keys()
-
-class ComboBoxDelegate(QStyledItemDelegate):
-    def createEditor(self, parent, options, index):
-        editor = QComboBox(parent)
-        editor.setFrame(False)
-        editor.addItems(View(parent).authors)
-        return editor
-
-    def setEditorData(self, editor, index):
-        value = index.model().data(index, Qt.EditRole)
-        editor.setCurrentIndex(value)
-
-    def updateEditorGeometry(self, editor, options, index):
-        editor.setGeometry(options.rect)
-
-    def setModelData(self, editor, model, index):
-        value = editor.currentIndex()
-        model.setData(index, value, Qt.EditRole)
+        self.model().selectAuthors()
+        return self.model().authors
 
 class Dialog(QDialog):
-    def __init__(self, parent=None):
+    def __init__(self, parent):
         super().__init__(parent)
         self.setWindowTitle('Задача')
 
@@ -208,6 +213,10 @@ class Dialog(QDialog):
             return None
         return result
 
+    @tname.setter
+    def tname(self, value):
+        self.__tname_edit.setText(value)
+
     @property
     def tcontent(self):
         result = self.__tcontent_edit.toPlainText().strip()
@@ -215,8 +224,14 @@ class Dialog(QDialog):
             return None
         return result
 
+    @tcontent.setter
+    def tcontent(self, value):
+        self.__tcontent_edit.setPlainText(value)
+
     @property
     def teacher(self):
         return self.__teacher_cmb.currentText()
 
-
+    @teacher.setter
+    def teacher(self, value):
+        self.__teacher_cmb.setCurrentText(value)
