@@ -10,6 +10,9 @@ class MainMenu(QMenuBar):
         self.__test_add = test_menu.addAction('Добавить')
         self.__test_update = test_menu.addAction('Редактировать')
         self.__test_delete = test_menu.addAction('Удалить')
+        variant_menu = self.addMenu('Вариант')
+        self.__variant_add = variant_menu.addAction('Добавить')
+        self.__variant_delete = variant_menu.addAction('Удалить')
         help_menu = self.addMenu('Справка')
         self.__about = help_menu.addAction('О программе...')
         self.__about_qt = help_menu.addAction('О библиотеке Qt...')
@@ -45,3 +48,11 @@ class MainMenu(QMenuBar):
     @property
     def test_delete(self):
         return self.__test_delete
+
+    @property
+    def variant_add(self):
+        return self.__variant_add
+
+    @property
+    def variant_delete(self):
+        return self.__variant_delete

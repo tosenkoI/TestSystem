@@ -130,7 +130,6 @@ class View(QTableView):
         hh = self.horizontalHeader()
         hh.setSectionResizeMode(hh.ResizeToContents)
         hh.setSectionResizeMode(2, hh.Stretch)
-        #self.setItemDelegateForColumn(3, ComboBoxDelegate(parent=self))
 
     @pyqtSlot()
     def add(self):
